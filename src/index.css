@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+    --color-primary-50: #121921;
+    --color-primary-100: #1F262E;
+    --color-primary-200: #3D4D5C;
+
+    --color-secondary-50: #4294D1;
+}
+
+:root {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Custom Animations */
+@keyframes blob {
+    0% {
+        transform: translate(0px, 0px) scale(1);
+    }
+
+    33% {
+        transform: translate(30px, -50px) scale(1.1);
+    }
+
+    66% {
+        transform: translate(-20px, 20px) scale(0.9);
+    }
+
+    100% {
+        transform: translate(0px, 0px) scale(1);
+    }
+}
+
+.animate-blob {
+    animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+    animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+    animation-delay: 4s;
+}
+
+.container{
+    max-width: 1440px;
+
+}
