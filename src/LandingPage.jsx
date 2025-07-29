@@ -8,15 +8,20 @@ import { Helmet } from 'react-helmet-async';
 const installCmd = 'npm install react-textflux';
 const usageCode = `import Editor from 'react-textflux';
 import "react-textflux/dist/react-textflux.css";
-
 function App() {
+  // Example: controlled usage with backend value
   const [description, setDescription] = React.useState('');
-  const mentions = [
-    { id: 1, name: 'John Doe', profile_pic: 'https://example.com/john.jpg' },
-    { id: 2, name: 'Jane Smith', profile_pic: 'https://example.com/jane.jpg' },
-    { id: 3, name: 'Bob Johnson' }
-  ];
+
+  // Simulate fetching from backend
+  React.useEffect(() => {
+    // fetch description from backend
+    setTimeout(() => setDescription('<p>Initial <b>description</b> from backend</p>'), 1000);
+  }, []);
+
+  // Example: custom upload logic (S3, base64, etc.)
   const handleMediaUpload = async (file, type) => {
+    // Upload file to your server or S3, return { url, type, name }
+    // Or fallback to base64:
     const toBase64 = file => new Promise((res, rej) => {
       const reader = new FileReader();
       reader.onload = () => res(reader.result);
@@ -26,25 +31,44 @@ function App() {
     const url = await toBase64(file);
     return { url, type, name: file.name };
   };
+
+  // Example: mention data
+  const mentions = [
+    { id: 1, name: 'John Doe', profile_pic: 'https://example.com/john.jpg' },
+    { id: 2, name: 'Jane Smith', profile_pic: 'https://example.com/jane.jpg' },
+    { id: 3, name: 'Bob Johnson' } // without profile_pic
+  ];
+
+  // Example: custom API call and clear on Enter
+  const handleEnter = async (e) => {
+    // 1. API call
+    await fetch('/your-api', { method: 'POST', body: JSON.stringify({ content: description }) });
+    // 2. Clear editor (controlled mode)
+    setDescription('');
+    // (Uncontrolled: e.target.innerHTML = '';) 
+  };
+
   return (
     <Editor
-      theme="dark"
+      theme="light" // or "dark"
       mentions={mentions}
       onMediaUpload={handleMediaUpload}
-      value={description}
-      onChange={setDescription}
-      mediaFullscreen={true}
+      value={description} // controlled value
+      onChange={setDescription} // updates state on any content change
+      mediaFullscreen={true} // <-- Add this line to enable fullscreen media preview
+      onEnter={handleEnter} // <-- Called when Enter is pressed
     />
   );
 }`;
 
 const propsTable = [
     { prop: 'theme', type: 'string', default: 'light', desc: "'light' or 'dark'" },
-    { prop: 'mentions', type: 'array', default: '[]', desc: 'User objects: [{id, name, profile_pic?}]' },
+    { prop: 'mentions', type: 'array', default: '[]', desc: 'Array of user objects: [{id, name, profile_pic?}]' },
     { prop: 'onMediaUpload', type: 'function', default: 'undefined', desc: 'Custom upload handler: (file, type) => Promise<{url, type, name}>' },
-    { prop: 'value', type: 'string', default: 'undefined', desc: 'Controlled value: HTML string' },
-    { prop: 'onChange', type: 'function', default: 'undefined', desc: 'Called with latest HTML string on change' },
-    { prop: 'mediaFullscreen', type: 'boolean', default: 'false', desc: 'Enable fullscreen preview for media' },
+    { prop: 'value', type: 'string', default: 'undefined', desc: 'Controlled value: HTML string to display in the editor. Use with onChange for controlled usage.' },
+    { prop: 'onChange', type: 'function', default: 'undefined', desc: 'Called with latest HTML string on any content change (typing, media, mentions, formatting, etc).' },
+    { prop: 'mediaFullscreen', type: 'boolean', default: 'false', desc: 'If true, images/videos are clickable and open in fullscreen overlay. If false or not set, media is not clickable.' },
+    { prop: 'onEnter', type: 'function', default: 'undefined', desc: 'Called with the keyboard event when Enter is pressed in the editor. Use for custom submit, save, or clear logic.' },
 ];
 
 const shortcuts = [
@@ -56,12 +80,15 @@ const shortcuts = [
     { action: 'Ordered List', keys: 'Ctrl+Shift+L / Cmd+Shift+L' },
     { action: 'Unordered List', keys: 'Ctrl+Shift+U / Cmd+Shift+U' },
     { action: 'Code Block', keys: 'Ctrl+K / Cmd+K' },
+    { action: 'Open emoji search', keys: 'Type : in editor' },
+    { action: 'Navigate emojis', keys: 'Arrow keys (↑↓←→)' },
+    { action: 'Select emoji', keys: 'Enter' },
+    { action: 'Close picker', keys: 'Escape' },
 ];
 
 const changelog = [
     'Fixed image/video insert buttons',
     'Improved cursor positioning',
-    'Enhanced error handling',
     'Fixed focus management',
     'Improved event handling',
     'Added existing media support',
@@ -69,46 +96,18 @@ const changelog = [
 ];
 
 const features = [
-    {
-        icon: 'icon-park-outline:text-bold',
-        title: 'Text Formatting',
-        desc: 'Bold, italic, underline, strikethrough, blockquote, lists',
-    },
-    {
-        icon: 'mynaui:at',
-        title: '@Mentions',
-        desc: 'User list with profile pic/initials, keyboard navigation',
-    },
-    {
-        icon: 'fluent:emoji-48-regular',
-        title: 'Emoji Picker',
-        desc: '200+ emojis, fast search, outside click to close',
-    },
-    {
-        icon: 'octicon:file-media-24',
-        title: 'Media Uploads',
-        desc: 'Images/videos with fullscreen preview, custom upload logic',
-    },
-    {
-        icon: 'fluent:code-block-48-regular',
-        title: 'Code Blocks',
-        desc: 'Insert code blocks, auto-format, text wrapping, monospace',
-    },
-    {
-        icon: 'streamline-sharp:light-dark-mode',
-        title: 'Light/Dark Theme',
-        desc: 'Switchable theme, pure CSS, tf- prefix',
-    },
-    {
-        icon: 'solar:full-screen-bold',
-        title: 'Media Fullscreen',
-        desc: 'Media preview in fullscreen',
-    },
-    {
-        icon: 'material-symbols-light:lock-outline',
-        title: 'CSS Isolation',
-        desc: 'All classes prefixed with tf- (no conflicts)',
-    },
+    { icon: 'icon-park-outline:text-bold', title: 'Text Formatting', desc: 'Bold, italic, underline, strikethrough, blockquote, lists' },
+    { icon: 'mynaui:at', title: '@Mentions', desc: 'User list with profile pic/initials, keyboard navigation, auto-scroll' },
+    { icon: 'fluent:emoji-48-regular', title: 'Enhanced Emoji Picker', desc: 'Type ":" to search, keyboard navigation, recently used, categories, auto-scroll' },
+    { icon: 'octicon:file-media-24', title: 'Media Uploads', desc: 'Images/videos with skeleton loader, fullscreen preview, custom upload logic' },
+    { icon: 'fluent:code-block-48-regular', title: 'Code Blocks', desc: 'Insert code blocks, auto-format, text wrapping, monospace, auto new line, focus inside block' },
+    { icon: 'streamline-sharp:light-dark-mode', title: 'Light/Dark Theme', desc: 'Switchable theme, pure CSS, tf- prefix' },
+    { icon: 'solar:full-screen-bold', title: 'Media Fullscreen', desc: 'Media preview in fullscreen, optional via prop' },
+    { icon: 'material-symbols-light:lock-outline', title: 'CSS Isolation', desc: 'All classes prefixed with tf- (no conflicts)' },
+    { icon: 'arcticons:brain-out', title: 'Smart Cursor', desc: 'Cursor moves to end after media, mention, emoji, code block' },
+    { icon: 'bi:keyboard', title: 'Accessibility', desc: 'All dropdowns and toolbars are keyboard accessible' },
+    { icon: 'material-symbols-light:lock-outline', title: 'Focus Management', desc: 'Improved focus between editor and toolbar' },
+    { icon: 'octicon:file-media-24', title: 'Existing Media Support', desc: 'All images/videos in content get fullscreen' },
 ];
 
 const benefits = [
@@ -313,12 +312,12 @@ export default function LandingPage() {
 
                         <div className="flex flex-col md:flex-row gap-3 md:gap-4 justify-center items-center mb-6 md:mb-10">
                             <a href="#installation" className="w-full md:w-auto">
-                                <button className="w-full md:w-auto bg-secondary-50 hover:bg-secondary-100 text-white font-bold text-lg px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mb-2 md:mb-0">
+                                <button className="w-full md:w-auto cursor-pointer bg-secondary-50 hover:bg-secondary-100 text-white font-bold text-lg px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mb-2 md:mb-0">
                                     Get Started
                                 </button>
                             </a>
                             <a href="#features" className="w-full md:w-auto">
-                                <button className="w-full md:w-auto bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 text-white font-semibold text-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105">
+                                <button className="w-full md:w-auto cursor-pointer bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 text-white font-semibold text-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105">
                                     View Features
                                 </button>
                             </a>
@@ -327,7 +326,7 @@ export default function LandingPage() {
                         {/* Stats */}
                         <div className="mt-8 md:mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-xs sm:max-w-sm md:max-w-4xl mx-auto">
                             <div className="text-center">
-                                <div className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">200+</div>
+                                <div className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">450+</div>
                                 <div className="text-zinc-400 text-sm md:text-base">Emojis Available</div>
                             </div>
                             <div className="text-center">
@@ -362,7 +361,7 @@ export default function LandingPage() {
                     </div>
                 </section>
 
-                <section className="max-w-[1440px] md:w-[80%] w-[88%] mx-auto  py-12" id="features">
+                <section className="max-w-[1440px] md:w-[80%] w-[88%] mx-auto py-12" id="features">
                     <h2 className="text-2xl font-bold mb-8">Features</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {features.map((f) => (
@@ -375,7 +374,26 @@ export default function LandingPage() {
                     </div>
                 </section>
 
-                <section className="max-w-[1440px] md:w-[80%] w-[88%] mx-auto  py-12" id="installation">
+                <section className="max-w-[1440px] md:w-[80%] w-[88%] mx-auto py-12" id="whatsnew">
+                    <h2 className="text-2xl font-bold mb-4">🚀 What's New</h2>
+                    <ul className="list-disc pl-6 text-zinc-300 space-y-2">
+                        <li><b>Production ready:</b> All major bugs fixed, UX polished</li>
+                        <li><b>Enhanced Emoji Picker:</b> Type <code>:</code> in editor to trigger emoji search, keyboard navigation with arrow keys, auto-scroll, recently used emojis, and category organization</li>
+                        <li><b>Mention dropdown:</b> Keyboard navigation auto-scrolls, dark/light theme highlight, visible text always</li>
+                        <li><b>Media skeleton loader:</b> Shows animated skeleton while uploading/inserting images/videos</li>
+                        <li><b>Unified media handling:</b> Paste, drag-and-drop, and toolbar all use the same upload logic</li>
+                        <li><b>Accessibility:</b> All dropdowns and toolbars are keyboard accessible</li>
+                        <li><b>CSS isolation:</b> All classes prefixed with <code>tf-</code> (no conflicts)</li>
+                        <li><b>Media fullscreen control:</b> You can now control whether images/videos are clickable for fullscreen preview using the <code>mediaFullscreen</code> prop on the Editor component.</li>
+                        <li><b>Smart cursor positioning:</b> Cursor automatically moves to the end after inserting media, mentions, or emojis</li>
+                        <li><b>Improved button reliability:</b> Fixed image/video insert buttons that sometimes didn't work</li>
+                        <li><b>Focus management:</b> Improved focus handling between editor and toolbar</li>
+                        <li><b>Existing media support:</b> All existing images/videos in editor content are automatically clickable for fullscreen preview</li>
+                        <li><b>Code block UX:</b> When you insert a code block, a new line is automatically added after it, but focus stays inside the code block so you can start typing code immediately. Move out of the code block with arrow keys or mouse to continue writing.</li>
+                    </ul>
+                </section>
+
+                <section className="max-w-[1440px] md:w-[80%] w-[88%] mx-auto py-12" id="installation">
                     <h2 className="text-2xl font-bold mb-4">Installation</h2>
                     <p className="mb-4 text-zinc-300">Install Textflux using npm or yarn:</p>
                     <Tooltip
@@ -420,10 +438,9 @@ export default function LandingPage() {
                     <h3 className="text-2xl font-bold mb-4">Customization</h3>
                     <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6">
                         <ul className="list-disc pl-6 text-zinc-300 space-y-2">
-                            <li>Props: <span className="font-mono">theme</span>, <span className="font-mono">mentions</span>, <span className="font-mono">mediaFullscreen</span>, <span className="font-mono">onMediaUpload</span>, <span className="font-mono">value</span>, <span className="font-mono">onChange</span></li>
-                            <li>No CSS framework required. All styles are pure CSS with <span className="font-mono">tf-</span> prefix for isolation.</li>
-                            <li>Custom upload logic supported via <span className="font-mono">onMediaUpload</span> prop.</li>
-                            <li>Theme can be toggled between light and dark.</li>
+                            <li><b>Mentions:</b> Pass your user list as <span className="font-mono">mentions</span> prop</li>
+                            <li><b>Toolbar/Theme:</b> Update colors in <span className="font-mono">src/index.css</span> for your brand</li>
+                            <li><b>Media Fullscreen:</b> Use the <span className="font-mono">mediaFullscreen</span> prop to control whether media is clickable for fullscreen preview.</li>
                         </ul>
                     </div>
                 </section>
@@ -506,9 +523,10 @@ export default function LandingPage() {
                 <section className="max-w-[1440px] md:w-[80%] w-[88%] mx-auto py-12" id="troubleshooting">
                     <h3 className="text-2xl font-bold mb-4">Troubleshooting</h3>
                     <ul className="list-disc pl-6 text-zinc-300 space-y-2">
-                        <li>Image/Video Insert Buttons Not Working: Ensure file input permissions, check browser console for errors.</li>
-                        <li>Vite Import Error: Ensure <span className="font-mono">package.json</span> and Vite config are correct. See README for details.</li>
-                        <li>React Context/JSX Runtime Errors: Make sure both app and library use the same React version.</li>
+                        <li><b>Image/Video Insert Buttons Not Working:</b> Fixed in latest version. If issues persist, check browser console for error messages. Ensure file input permissions are granted.</li>
+                        <li><b>Emoji Picker Not Opening:</b> Type <code>:</code> in editor to trigger emoji search. Ensure no other keyboard shortcuts are conflicting. Check browser console for any JavaScript errors.</li>
+                        <li><b>Vite Import Error:</b> Make sure your <span className="font-mono">package.json</span> has correct <span className="font-mono">main</span>, <span className="font-mono">module</span>, and <span className="font-mono">exports</span> fields. Clear node_modules and reinstall: <span className="font-mono">rm -rf node_modules package-lock.json && npm install</span></li>
+                        <li><b>React Context/JSX Runtime Errors:</b> Make sure both app and library use the same React version.</li>
                     </ul>
                 </section>
 
