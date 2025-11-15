@@ -5,6 +5,8 @@ import Tooltip from './components/Tooltip';
 import textflux_light from './assets/textflux_light.png';
 import { Icon } from "@iconify/react";
 import { Helmet } from 'react-helmet-async';
+import Editor from 'react-textflux';
+import "react-textflux/dist/react-textflux.css";
 const installCmd = 'npm install react-textflux';
 const usageCode = `import Editor from 'react-textflux';
 import "react-textflux/dist/react-textflux.css";
@@ -112,7 +114,7 @@ const features = [
 
 const benefits = [
     {
-        icon: 'hugeicons:tick-double-01',
+        icon: 'ph:seal-check-fill',
         title: 'Production Ready',
         desc: 'Built for real-world apps — reliable, optimized, and battle-tested.',
     },
@@ -147,6 +149,9 @@ export default function LandingPage() {
     const [dark, setDark] = useState(true);
     const [copied, setCopied] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [editorContent, setEditorContent] = useState('<b>Welcome to Textflux!</b><p>This is a live demo. You can <b>bold</b>, <i>italicize</i>, or <u>underline</u> text. Mention a user like @rahul or insert an emoji! 😉</p><blockquote>Start typing and see the magic happen on the right panel.</blockquote><ul><li>Unordered list item one.</li><li>Unordered list item two.</li></ul><ol><li>Ordered list item one.</li><li>Ordered list item two.</li></ol><pre class="tf-code-block">console.log("Hello, World!");</pre><br><img alt="A person standing in a desert canyon" class="rounded-lg" src="https://res.cloudinary.com/dploayg6l/image/upload/v1763238228/textflux-demo-image_hvsatd.png"/>');
+    const [editorTheme, setEditorTheme] = useState('dark');
+    const [htmlCopied, setHtmlCopied] = useState(false);
 
     React.useEffect(() => {
         document.documentElement.classList.toggle('dark', dark);
@@ -168,6 +173,146 @@ export default function LandingPage() {
                 document.body.removeChild(textarea);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
+            } catch (err2) {
+                console.error('Failed to copy: ', err2);
+            }
+        }
+    };
+
+    const handleMediaUpload = async (file, type) => {
+        // Convert to base64
+        const toBase64 = file => new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload = () => res(reader.result);
+            reader.onerror = rej;
+            reader.readAsDataURL(file);
+        });
+        const url = await toBase64(file);
+        return { url, type, name: file.name };
+    };
+
+    const mentions = [
+        { id: 1, name: 'John Doe', profile_pic: 'https://i.pravatar.cc/150?img=1' },
+        { id: 2, name: 'Jane Smith', profile_pic: 'https://i.pravatar.cc/150?img=2' },
+        { id: 3, name: 'Rahul Bairwa' },
+        { id: 4, name: 'Bob Johnson' }
+    ];
+
+    // Function to format HTML with proper indentation
+    const formatHTML = (html) => {
+        if (!html) return '';
+
+        try {
+            // Use DOMParser for better HTML parsing
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            const formatNode = (node, indent = 0) => {
+                const tab = '  ';
+                let result = '';
+
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tagName = node.tagName.toLowerCase();
+                    const isVoid = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'].includes(tagName);
+
+                    // Build opening tag with attributes
+                    let attrs = '';
+                    if (node.attributes && node.attributes.length > 0) {
+                        attrs = Array.from(node.attributes)
+                            .map(attr => `${attr.name}="${attr.value}"`)
+                            .join(' ');
+                    }
+
+                    const openTag = attrs ? `<${tagName} ${attrs}>` : `<${tagName}>`;
+
+                    // Get child nodes
+                    const children = Array.from(node.childNodes);
+                    const hasTextOnly = children.length === 1 && children[0].nodeType === Node.TEXT_NODE;
+
+                    if (isVoid || (children.length === 0 && !hasTextOnly)) {
+                        // Void element or empty element
+                        result += tab.repeat(indent) + openTag.replace('>', ' />') + '\n';
+                    } else if (hasTextOnly && children[0].textContent.trim()) {
+                        // Element with only text content
+                        const text = children[0].textContent.trim();
+                        result += tab.repeat(indent) + openTag + text + `</${tagName}>\n`;
+                    } else {
+                        // Element with child elements
+                        result += tab.repeat(indent) + openTag + '\n';
+                        children.forEach(child => {
+                            result += formatNode(child, indent + 1);
+                        });
+                        result += tab.repeat(indent) + `</${tagName}>\n`;
+                    }
+                } else if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent.trim();
+                    if (text) {
+                        result += tab.repeat(indent) + text + '\n';
+                    }
+                }
+
+                return result;
+            };
+
+            // Format body content
+            let formatted = '';
+            Array.from(doc.body.childNodes).forEach(child => {
+                formatted += formatNode(child, 0);
+            });
+
+            return formatted.trim() || html;
+        } catch (err) {
+            // Fallback to simple formatting if DOMParser fails
+            let formatted = '';
+            let indent = 0;
+            const tab = '  ';
+
+            html = html.replace(/>\s+</g, '><');
+            const tokens = html.split(/(<[^>]+>)/g);
+
+            for (let i = 0; i < tokens.length; i++) {
+                const token = tokens[i];
+                if (!token.trim()) continue;
+
+                if (token.startsWith('</')) {
+                    indent = Math.max(0, indent - 1);
+                    formatted += tab.repeat(indent) + token + '\n';
+                } else if (token.startsWith('<')) {
+                    formatted += tab.repeat(indent) + token + '\n';
+                    const isVoid = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)/i.test(token);
+                    const isSelfClosing = token.endsWith('/>');
+                    if (!isVoid && !isSelfClosing && !token.startsWith('</')) {
+                        indent++;
+                    }
+                } else {
+                    const trimmed = token.trim();
+                    if (trimmed) {
+                        formatted += tab.repeat(indent) + trimmed + '\n';
+                    }
+                }
+            }
+
+            return formatted.trim();
+        }
+    };
+
+    const formattedHTML = formatHTML(editorContent);
+
+    const handleCopyHtml = async () => {
+        try {
+            await navigator.clipboard.writeText(formattedHTML || editorContent);
+            setHtmlCopied(true);
+            setTimeout(() => setHtmlCopied(false), 2000);
+        } catch (err) {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = formattedHTML || editorContent;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                setHtmlCopied(true);
+                setTimeout(() => setHtmlCopied(false), 2000);
             } catch (err2) {
                 console.error('Failed to copy: ', err2);
             }
@@ -213,8 +358,8 @@ export default function LandingPage() {
             </Helmet>
 
             <div className={classNames('min-h-screen bg-primary-50 text-zinc-100', dark ? 'dark' : '')}>
-                <header className="w-full font-sans sticky bg-primary-50 top-0 left-0 right-0 z-50">
-                    <div className="max-w-[1440px] w-[88%] mx-auto flex items-center justify-between px-4 md:px-8 py-5">
+                <header className="w-full font-sans sticky top-0 left-0 right-0 z-50 backdrop-blur-sm bg-primary-50/80">
+                    <div className="max-w-[1440px] w-[88%] mx-auto flex items-center justify-between px-4 md:px-8 py-4 md:py-5">
                         <div className="flex items-center gap-3">
                             <img
                                 src={textflux_light}
@@ -223,14 +368,14 @@ export default function LandingPage() {
                             />
                         </div>
                         {/* Desktop Nav */}
-                        <nav className="hidden md:flex items-center gap-8">
-                            <a href="#features" className="text-white font-semibold text-lg hover:text-blue-400 transition">Features</a>
-                            <a href="#usage" className="text-white font-semibold text-lg hover:text-blue-400 transition">Usage</a>
-                            <a href="#customization" className="text-white font-semibold text-lg hover:text-blue-400 transition">Customization</a>
-                            <a href="#installation" className="text-white font-semibold text-lg hover:text-blue-400 transition">Installation</a>
-                            {/* <a href="#react-native" className="text-white font-semibold text-lg hover:text-blue-400 transition">React Native</a> */}
-                            <a href="#installation">
-                                <button className="ml-4 bg-secondary-50 hover:bg-blue-500 text-white font-bold text-lg px-6 py-3 min-w-40 rounded-xl cursor-pointer shadow-none transition-all">Get Started</button>
+                        <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+                            <a href="#features" className="text-white font-medium text-base hover:text-blue-400 transition-colors">Features</a>
+                            <a href="#live-demo" className="text-white font-medium text-base hover:text-blue-400 transition-colors">Live Demo</a>
+                            <a href="#usage" className="text-white font-medium text-base hover:text-blue-400 transition-colors">Usage</a>
+                            <a href="#installation" className="text-white font-medium text-base hover:text-blue-400 transition-colors">Installation</a>
+                            <a href="#customization" className="text-white font-medium text-base hover:text-blue-400 transition-colors">Customization</a>
+                            <a href="#installation" className="ml-2">
+                                <button className="bg-secondary-50 hover:bg-blue-500 text-white font-semibold text-base px-6 py-2.5 rounded-lg cursor-pointer transition-all duration-200">Get Started</button>
                             </a>
                         </nav>
                         {/* Hamburger Button (Mobile) */}
@@ -250,92 +395,99 @@ export default function LandingPage() {
                     </div>
                     {/* Mobile Menu */}
                     {menuOpen && (
-                        <div className="md:hidden bg-primary-50 border-b border-zinc-700 px-4 py-6 w-full animate-fade-in-down">
+                        <div className="md:hidden bg-primary-50/95 backdrop-blur-sm border-b border-zinc-700/50 px-4 py-6 w-full animate-fade-in-down">
                             <nav className="flex flex-col gap-4">
-                                <a href="#features" className="text-white font-semibold text-lg hover:text-blue-400 transition" onClick={() => setMenuOpen(false)}>Features</a>
-                                <a href="#usage" className="text-white font-semibold text-lg hover:text-blue-400 transition" onClick={() => setMenuOpen(false)}>Usage</a>
-                                <a href="#customization" className="text-white font-semibold text-lg hover:text-blue-400 transition" onClick={() => setMenuOpen(false)}>Customization</a>
-                                <a href="#installation" className="text-white font-semibold text-lg hover:text-blue-400 transition" onClick={() => setMenuOpen(false)}>Installation</a>
-                                <a href="#react-native" className="text-white font-semibold text-lg hover:text-blue-400 transition" onClick={() => setMenuOpen(false)}>React Native</a>
+                                <a href="#features" className="text-white font-medium text-base hover:text-blue-400 transition-colors" onClick={() => setMenuOpen(false)}>Features</a>
+                                <a href="#live-demo" className="text-white font-medium text-base hover:text-blue-400 transition-colors" onClick={() => setMenuOpen(false)}>Live Demo</a>
+                                <a href="#usage" className="text-white font-medium text-base hover:text-blue-400 transition-colors" onClick={() => setMenuOpen(false)}>Usage</a>
+                                <a href="#installation" className="text-white font-medium text-base hover:text-blue-400 transition-colors" onClick={() => setMenuOpen(false)}>Installation</a>
+                                <a href="#customization" className="text-white font-medium text-base hover:text-blue-400 transition-colors" onClick={() => setMenuOpen(false)}>Customization</a>
                                 <a href="#installation" className="mt-2">
-                                    <button className="w-full bg-secondary-50 hover:bg-blue-500 text-white font-bold text-lg px-6 py-3 min-w-40 rounded-xl cursor-pointer shadow-none transition-all" onClick={() => setMenuOpen(false)}>
+                                    <button className="w-full bg-secondary-50 hover:bg-blue-500 text-white font-semibold text-base px-6 py-2.5 rounded-lg cursor-pointer transition-all duration-200" onClick={() => setMenuOpen(false)}>
                                         Get Started
                                     </button>
                                 </a>
                             </nav>
                         </div>
                     )}
-                    <div className="border-b border-zinc-700 w-full" />
                 </header>
 
-                <section className="relative min-h-screen flex items-center justify-center px-2 py-8 md:py-20 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-primary-100 to-primary-200 opacity-50"></div>
-                    <div className="absolute inset-0 overflow-hidden">
-                        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-                        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-                        <div className="absolute top-40 left-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+                <section className="relative min-h-screen flex items-center justify-center px-2 py-8 md:py-20 overflow-hidden bg-primary-50">
+                    {/* Background gradients - circular gradients from left (blue) and right (purple) */}
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                        {/* Blue circular gradient from left */}
+                        <div 
+                            className="absolute left-0 w-[600px] h-[600px] md:w-[800px] md:h-[800px] rounded-full filter blur-[120px] md:blur-[150px]"
+                            style={{
+                                background: 'radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, rgba(59, 130, 246, 0.15) 40%, rgba(59, 130, 246, 0.05) 60%, transparent 80%)',
+                                top: '50%',
+                                transform: 'translate(-30%, -50%)'
+                            }}
+                        ></div>
+                        {/* Purple circular gradient from right */}
+                        <div 
+                            className="absolute right-0 w-[600px] h-[600px] md:w-[800px] md:h-[800px] rounded-full filter blur-[120px] md:blur-[150px]"
+                            style={{
+                                background: 'radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.15) 40%, rgba(168, 85, 247, 0.05) 60%, transparent 80%)',
+                                top: '50%',
+                                transform: 'translate(30%, -50%)'
+                            }}
+                        ></div>
+                    </div>
+                    {/* Animated blob effects for subtle movement */}
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                        <div className="absolute -top-40 -left-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-[120px] opacity-15 animate-blob"></div>
+                        <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-[120px] opacity-15 animate-blob animation-delay-2000"></div>
                     </div>
 
                     <div className="relative z-10 w-full max-w-xs sm:max-w-sm md:max-w-2xl lg:max-w-4xl mx-auto text-center">
-                        {/* Logo (desktop only) */}
-                        <div className="hidden md:block mb-8">
-                            <div className="flex items-center justify-center gap-4 mb-6">
-                                <img
-                                    src={textflux_light}
-                                    alt="Textflux Logo"
-                                    className="h-16 w-auto drop-shadow-lg"
-                                />
-                            </div>
+                        {/* Badges */}
+                        <div className="flex flex-wrap justify-center gap-3 mb-6 md:mb-8">
+                            <span className="bg-blue-500/80 backdrop-blur-sm border border-blue-400/30 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg">
+                                Production Ready
+                            </span>
+                            <span className="bg-purple-500/80 backdrop-blur-sm border border-purple-400/30 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg">
+                                Zero CSS Conflicts
+                            </span>
                         </div>
-                        <h1 className="text-xl md:text-3xl font-semibold text-white mb-4 md:mb-6 max-w-full mx-auto leading-relaxed">
+
+                        {/* Main Headline */}
+                        <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-4 md:mb-6 max-w-full mx-auto leading-tight">
                             Reimagine rich text editing in your React app
                         </h1>
 
-                        <p className="text-base md:text-lg text-zinc-300 mb-4 md:mb-8 max-w-full mx-auto leading-relaxed">
-                            Built for developers who want flexibility, smart defaults, and zero CSS conflicts. Drop in the editor and start shipping.
+                        {/* Subtitle */}
+                        <p className="text-base md:text-lg lg:text-xl text-zinc-300 mb-6 md:mb-10 max-w-2xl mx-auto leading-relaxed">
+                            Built for developers who want flexibility, smart defaults, and zero CSS conflicts.
                         </p>
 
-                        <div className="flex flex-wrap justify-center gap-2 md:gap-4 mb-6 md:mb-10">
-                            <span className="bg-white/10 flex items-center gap-2 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-xs md:text-sm font-medium text-white">
-                                <Icon icon="streamline-emojis:sparkles" className="text-base md:text-xl" /> Production Ready
-                            </span>
-                            <span className="bg-white/10 flex items-center gap-2 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-xs md:text-sm font-medium text-white">
-                                <Icon icon="unjs:theme-colors" className="text-base md:text-xl" /> Zero CSS Conflicts
-                            </span>
-                            <span className="bg-white/10 flex items-center gap-2 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-xs md:text-sm font-medium text-white">
-                                <Icon icon="noto:brain" className="text-base md:text-xl" /> Smart Cursor
-                            </span>
-                            <span className="bg-white/10 flex items-center gap-2 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-xs md:text-sm font-medium text-white">
-                                <Icon icon="fluent-emoji:puzzle-piece" className="text-base md:text-xl" /> Fully Customizable
-                            </span>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row gap-3 md:gap-4 justify-center items-center mb-6 md:mb-10">
-                            <a href="#installation" className="w-full md:w-auto">
-                                <button className="w-full md:w-auto cursor-pointer bg-secondary-50 hover:bg-secondary-100 text-white font-bold text-lg px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mb-2 md:mb-0">
+                        {/* CTA Buttons */}
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12 md:mb-16">
+                            <a href="#installation" className="w-full sm:w-auto">
+                                <button className="w-full sm:w-auto cursor-pointer bg-secondary-50 hover:bg-blue-500 text-white font-bold text-lg px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                                     Get Started
                                 </button>
                             </a>
-                            <a href="#features" className="w-full md:w-auto">
-                                <button className="w-full md:w-auto cursor-pointer bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 text-white font-semibold text-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105">
-                                    View Features
+                            <a href="#live-demo" className="w-full sm:w-auto">
+                                <button className="w-full sm:w-auto cursor-pointer bg-zinc-800/80 hover:bg-zinc-700/80 backdrop-blur-sm border border-zinc-700/50 text-white font-semibold text-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105">
+                                    Try Live Demo
                                 </button>
                             </a>
                         </div>
 
                         {/* Stats */}
-                        <div className="mt-8 md:mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-xs sm:max-w-sm md:max-w-4xl mx-auto">
+                        <div className="mt-8 md:mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 max-w-4xl mx-auto">
                             <div className="text-center">
-                                <div className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">450+</div>
-                                <div className="text-zinc-400 text-sm md:text-base">Emojis Available</div>
+                                <div className="text-4xl md:text-5xl font-bold text-[#3B82F6] mb-2">450+</div>
+                                <div className="text-zinc-400 text-base md:text-lg">Emojis</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">0</div>
-                                <div className="text-zinc-400 text-sm md:text-base">CSS Conflicts</div>
+                                <div className="text-4xl md:text-5xl font-bold text-[#3B82F6] mb-2">0</div>
+                                <div className="text-zinc-400 text-base md:text-lg">CSS Conflicts</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">1000+</div>
-                                <div className="text-zinc-400 text-sm md:text-base">Weekly Downloads</div>
+                                <div className="text-4xl md:text-5xl font-bold text-[#3B82F6] mb-2">1000+</div>
+                                <div className="text-zinc-400 text-base md:text-lg">Weekly Downloads</div>
                             </div>
                         </div>
                     </div>
@@ -348,12 +500,103 @@ export default function LandingPage() {
                     </div>
                 </section>
 
+                {/* Live Demo Section */}
+                <section className="max-w-[1440px] w-[88%] md:w-[90%] mx-auto py-12 md:py-20" id="live-demo">
+                    <div className="text-center mb-8 md:mb-12">
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4">
+                            Experience Textflux Live
+                        </h2>
+                        <p className="text-base md:text-lg text-zinc-400 max-w-2xl mx-auto">
+                            Interact with the editor and see the clean HTML output in real-time.
+                        </p>
+                    </div>
+
+                    <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+                        {/* Top bar with theme toggle */}
+                        <div className="bg-zinc-800/50 border-b border-zinc-700 px-4 md:px-6 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-zinc-400 text-sm">Theme:</span>
+                                <button
+                                    onClick={() => setEditorTheme(editorTheme === 'dark' ? 'light' : 'dark')}
+                                    className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+                                >
+                                    {editorTheme === 'dark' ? (
+                                        <Icon icon="solar:moon-bold" className="w-5 h-5 text-blue-400" />
+                                    ) : (
+                                        <Icon icon="solar:sun-bold" className="w-5 h-5 text-yellow-400" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-0 divide-x-0 md:divide-x divide-zinc-800">
+                            {/* Left Panel - Editor */}
+                            <div className="p-4 md:p-6 bg-zinc-900/50">
+                                <Editor
+                                    theme={editorTheme}
+                                    mentions={mentions}
+                                    onMediaUpload={handleMediaUpload}
+                                    value={editorContent}
+                                    onChange={setEditorContent}
+                                    mediaFullscreen={true}
+                                />
+                            </div>
+
+                            {/* Right Panel - HTML Output */}
+                            <div className="p-4 md:p-6 bg-zinc-950/50 relative">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-white font-semibold text-sm md:text-base">HTML Output</h3>
+                                    <button
+                                        onClick={handleCopyHtml}
+                                        className="text-xs md:text-sm text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                                    >
+                                        {htmlCopied ? (
+                                            <>
+                                                <Icon icon="mdi:check" className="w-4 h-4" />
+                                                Copied!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icon icon="mdi:content-copy" className="w-4 h-4" />
+                                                Copy Code
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                                <div className="my-scroll max-h-[600px] overflow-y-scroll">
+                                    <SyntaxHighlighter
+                                        language="html"
+                                        style={dark ? oneDark : oneLight}
+                                        PreTag="div" // prevent <pre> from becoming the scroller
+                                        wrapLongLines
+                                        customStyle={{
+                                            background: 'transparent',
+                                            margin: 0,
+                                            padding: 0,
+                                            maxHeight: 'none',
+                                            overflow: 'visible',
+                                        }}
+                                    >
+                                        {formattedHTML || '<p>Start typing to see HTML output...</p>'}
+                                    </SyntaxHighlighter>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <section className="max-w-[1440px] md:w-[80%] w-[88%] mx-auto py-12" id="benefits">
                     <h2 className="text-2xl font-bold mb-8">Why Textflux?</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                         {benefits.map((b) => (
                             <div key={b.title} className="bg-primary-100 border border-primary-200 rounded-xl p-6 flex flex-col items-center text-center shadow-sm hover:shadow-lg transition-all duration-200">
-                                <Icon icon={b.icon} className="text-3xl mb-3" />
+                                <Icon icon={b.icon} className="text-[#3B82F6] text-3xl mb-3" />
                                 <div className="font-semibold  leading-6 text-lg mb-1 text-zinc-100">{b.title}</div>
                                 <div className="text-zinc-400 text-sm">{b.desc}</div>
                             </div>
@@ -366,7 +609,7 @@ export default function LandingPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {features.map((f) => (
                             <div key={f.title} className="bg-primary-100 border border-primary-200 rounded-xl p-6 flex flex-col items-center text-center shadow-sm hover:shadow-lg transition-all duration-200">
-                                <Icon icon={f.icon} className="text-3xl mb-3" />
+                                <Icon icon={f.icon} className="text-[#3B82F6] text-3xl mb-3" />
                                 <div className="font-semibold text-lg mb-1 text-zinc-100">{f.title}</div>
                                 <div className="text-zinc-400 text-sm">{f.desc}</div>
                             </div>
